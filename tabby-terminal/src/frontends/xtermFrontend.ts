@@ -82,6 +82,7 @@ export class XTermFrontend extends Frontend {
     private opened = false
     private resizeObserver?: any
     private flowControl: FlowControl
+    private viewportIsAtBottom = true
 
     private configService: ConfigService
     private hotkeysService: HotkeysService
@@ -213,7 +214,21 @@ export class XTermFrontend extends Frontend {
         })
 
         this.xtermCore._scrollToBottom = this.xtermCore.scrollToBottom.bind(this.xtermCore)
-        this.xtermCore.scrollToBottom = () => null
+
+        // Track whether the viewport is following the bottom of the buffer.
+        // When the user scrolls up to read history, we stop auto-scrolling.
+        // When the user returns to the bottom (scroll, hotkey, or typing input),
+        // auto-scrolling resumes.  Fixes #10648.
+        this.xterm.onScroll(() => {
+            const buffer = this.xterm.buffer.active
+            this.viewportIsAtBottom = buffer.viewportY >= buffer.baseY
+        })
+
+        this.xtermCore.scrollToBottom = () => {
+            if (this.viewportIsAtBottom) {
+                this.xtermCore._scrollToBottom()
+            }
+        }
 
         this.resizeHandler = () => {
             try {
@@ -382,6 +397,7 @@ export class XTermFrontend extends Frontend {
     }
 
     scrollToBottom (): void {
+        this.viewportIsAtBottom = true
         this.xtermCore._scrollToBottom()
     }
 
